@@ -178,13 +178,18 @@ def parse_args():
   parser.add_argument('--video_input_dir', type=str, 
     default='./video_input',
     help='Relative or absolute directory path to input frames.')
+
+  parser.add_argument('--flow_input_dir', type=str, 
+    default='./video_input',
+    help='Relative or absolute directory path to optical flows of frames.')
   
   parser.add_argument('--video_output_dir', type=str, 
     default='./video_output',
     help='Relative or absolute directory path to output frames.')
   
   parser.add_argument('--content_frame_frmt', type=str, 
-    default='frame_{}.ppm',
+    # default='frame_{}.ppm',
+    default='crop_{}.jpg',
     help='Filename format of the input content frames.')
   
   parser.add_argument('--backward_optical_flow_frmt', type=str, 
@@ -630,7 +635,8 @@ def get_optimizer(loss):
   return optimizer
 
 def write_video_output(frame, output_img):
-  fn = args.content_frame_frmt.format(str(frame).zfill(4))
+  print('Writing frame {} with size '.format(frame), output_img.shape)
+  fn = args.content_frame_frmt.format(str(frame).zfill(2))
   path = os.path.join(args.video_output_dir, fn)
   write_image(path, output_img)
 
@@ -695,7 +701,7 @@ def get_init_image(init_type, content_img, style_imgs, frame=None):
     return init_img
 
 def get_content_frame(frame):
-  fn = args.content_frame_frmt.format(str(frame).zfill(4))
+  fn = args.content_frame_frmt.format(str(frame).zfill(2))
   path = os.path.join(args.video_input_dir, fn)
   img = read_image(path)
   return img
@@ -751,7 +757,7 @@ def get_mask_image(mask_img, width, height):
 def get_prev_frame(frame):
   # previously stylized frame
   prev_frame = frame - 1
-  fn = args.content_frame_frmt.format(str(prev_frame).zfill(4))
+  fn = args.content_frame_frmt.format(str(prev_frame).zfill(2))
   path = os.path.join(args.video_output_dir, fn)
   img = cv2.imread(path, cv2.IMREAD_COLOR)
   check_image(img, path)
@@ -762,7 +768,7 @@ def get_prev_warped_frame(frame):
   prev_frame = frame - 1
   # backwards flow: current frame -> previous frame
   fn = args.backward_optical_flow_frmt.format(str(frame), str(prev_frame))
-  path = os.path.join(args.video_input_dir, fn)
+  path = os.path.join(args.flow_input_dir, fn)
   flow = read_flow_file(path)
   warped_img = warp_image(prev_img, flow).astype(np.float32)
   img = preprocess(warped_img)
@@ -827,9 +833,10 @@ def render_single_image():
 
 def render_video():
   for frame in range(args.start_frame, args.end_frame+1):
+    print('Stylizing frame {}'.format(frame))
     with tf.Graph().as_default():
       print('\n---- RENDERING VIDEO FRAME: {}/{} ----\n'.format(frame, args.end_frame))
-      if frame == 1:
+      if frame == args.start_frame:
         content_frame = get_content_frame(frame)
         style_imgs = get_style_images(content_frame)
         init_img = get_init_image(args.first_frame_type, content_frame, style_imgs, frame)
